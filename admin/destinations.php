@@ -1,81 +1,44 @@
 <?php
 session_start();
+include 'includes/connexion.php';
 
-// Connexion à la base de données
-try {
-    $dsn = "mysql:host=localhost;dbname=projet;charset=utf8";
-    $username = "root"; // Remplace par ton utilisateur MySQL (par défaut "root" sur XAMPP)
-    $password = ""; // Remplace par ton mot de passe MySQL (par défaut vide sur XAMPP)
-    $connexion = new PDO($dsn, $username, $password);
-    $connexion->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch (PDOException $e) {
-    die("Erreur de connexion à la base de données : " . $e->getMessage());
+// Vérifier si l'utilisateur est connecté (simulation)
+if (!isset($_SESSION['admin'])) {
+    $_SESSION['admin'] = true; // À remplacer par un vrai système de connexion
 }
 
-// Traitement des formulaires
-$message = '';
-$message_type = '';
+// Gestion de la recherche
+$search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
+$search_sql = $search_query ? "WHERE nom LIKE :search OR pays LIKE :search" : "";
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['action'])) {
-        if ($_POST['action'] === 'login') {
-            // Traitement de la connexion
-            $email = trim($_POST['email']);
-            $password = trim($_POST['password']);
+// Gestion de la pagination
+$limit = 10; // Nombre de destinations par page
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+$offset = ($page - 1) * $limit;
 
-            if (empty($email) || empty($password)) {
-                $message = "Veuillez remplir tous les champs.";
-                $message_type = "danger";
-            } else {
-                $stmt = $connexion->prepare("SELECT * FROM users WHERE email = ?");
-                $stmt->execute([$email]);
-                $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-                if ($user && password_verify($password, $user['password'])) {
-                    $_SESSION['user_id'] = $user['id'];
-                    $_SESSION['user_name'] = $user['name'];
-                    $message = "Connexion réussie ! Bienvenue, " . htmlspecialchars($user['name']) . ".";
-                    $message_type = "success";
-                    header("Location: index.php");
-                    exit();
-                } else {
-                    $message = "Email ou mot de passe incorrect.";
-                    $message_type = "danger";
-                }
-            }
-        } elseif ($_POST['action'] === 'signup') {
-            // Traitement de l'inscription
-            $name = trim($_POST['name']);
-            $email = trim($_POST['email']);
-            $telephone = trim($_POST['telephone']);
-            $adresse = trim($_POST['adresse']);
-            $password = trim($_POST['password']);
-
-            if (empty($name) || empty($email) || empty($telephone) || empty($adresse) || empty($password)) {
-                $message = "Veuillez remplir tous les champs.";
-                $message_type = "danger";
-            } else {
-                $stmt = $connexion->prepare("SELECT id FROM users WHERE email = ?");
-                $stmt->execute([$email]);
-                if ($stmt->fetch()) {
-                    $message = "Cet email est déjà utilisé.";
-                    $message_type = "danger";
-                } else {
-                    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                    try {
-                        $stmt = $connexion->prepare("INSERT INTO users (name, email, telephone, adresse, password) VALUES (?, ?, ?, ?, ?)");
-                        $stmt->execute([$name, $email, $telephone, $adresse, $hashed_password]);
-                        $message = "Inscription réussie ! Veuillez vous connecter.";
-                        $message_type = "success";
-                    } catch (PDOException $e) {
-                        $message = "Erreur lors de l'inscription : " . $e->getMessage();
-                        $message_type = "danger";
-                    }
-                }
-            }
-        }
-    }
+// Compter le nombre total de destinations pour la pagination
+$stmt = $connexion->prepare("SELECT COUNT(*) as total FROM destinations $search_sql");
+if ($search_query) {
+    $stmt->execute(['search' => "%$search_query%"]);
+} else {
+    $stmt->execute();
 }
+$total_destinations = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+$total_pages = ceil($total_destinations / $limit);
+
+// Récupérer les destinations
+$stmt = $connexion->prepare("SELECT * FROM destinations $search_sql LIMIT :limit OFFSET :offset");
+$stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+if ($search_query) {
+    $stmt->bindValue(':search', "%$search_query%");
+}
+$stmt->execute();
+$destinations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Gestion des messages
+$message = isset($_SESSION['message']) ? $_SESSION['message'] : '';
+unset($_SESSION['message']);
 ?>
 
 <!DOCTYPE html>
@@ -83,181 +46,218 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Connexion - Messai Travel</title>
+  <title>Gestion des destinations - Agence de voyage</title>
+  
+  <!-- Bootstrap CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+
   <style>
     body {
-      display: flex;
-      flex-direction: column;
+      font-family: sans-serif;
+      background-color: #f8f9fa;
+      margin: 0;
+    }
+    .sidebar {
+      width: 220px;
+      background-color: #243e93;
       min-height: 100vh;
-      justify-content: center;
-      align-items: center;
-      background: linear-gradient(rgba(255,255,255,0.9), rgba(255,255,255,0.9)), url('images/hero.jpg') center/cover no-repeat;
+      color: white;
+      position: fixed;
+      top: 0;
+      left: 0;
+      transition: transform 0.3s ease;
+      z-index: 1000;
     }
-    .login-container {
-      width: 100%;
-      max-width: 400px;
-      margin: 20px;
+    .sidebar-hidden {
+      transform: translateX(-220px);
     }
-    .tab-links {
-      display: flex;
-      justify-content: center;
-      margin-bottom: 20px;
-    }
-    .tab-link {
-      color: var(--bleu);
-      font-weight: 500;
-      margin: 0 15px;
+    .sidebar a {
+      color: white;
       text-decoration: none;
-      transition: color 0.3s ease;
+      display: block;
+      padding: 10px 15px;
     }
-    .tab-link:hover,
-    .tab-link.active {
-      color: var(--jaune);
+    .sidebar a:hover {
+      background-color: #fbcd07;
+      color: #243e93;
     }
-    .form-group {
-      margin-bottom: 15px;
+    .content {
+      margin-left: 220px;
+      padding: 20px;
+      transition: margin-left 0.3s ease;
     }
-    .navbar-brand {
-      font-size: 1.5rem;
-      font-weight: 600;
-      color: var(--jaune);
+    .content-full {
+      margin-left: 0;
     }
-    .navbar-brand span {
-      color: var(--bleu);
+    .card {
+      border: none;
+      border-radius: 10px;
     }
-    .navbar {
-      width: 100%;
-      padding: 10px 20px;
+    .search-container {
+      max-width: 500px;
     }
-    .navbar .container-fluid {
-      padding-left: 20px;
-      padding-right: 20px;
+    .hamburger {
+      display: none;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 10px;
     }
-    .alert {
-      border-radius: 6px;
-      margin-bottom: 20px;
+    @media (max-width: 768px) {
+      .sidebar {
+        transform: translateX(-220px);
+      }
+      .sidebar-active {
+        transform: translateX(0);
+      }
+      .content {
+        margin-left: 0;
+      }
+      .hamburger {
+        display: block;
+      }
     }
   </style>
 </head>
 <body>
-  <!-- Navbar -->
-  <nav class="navbar navbar-expand-lg w-100">
-    <div class="container-fluid">
-      <a class="navbar-brand" href="index.html">Messai<span>Travel</span></a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <div class="collapse navbar-collapse" id="navbarNav">
-        <div class="navbar-nav ms-auto">
-          <a class="nav-link" href="index.html">Accueil</a>
-          <a class="nav-link" href="destinations.html">Destinations</a>
-          <a class="nav-link" href="offres.html">Offres</a>
-          <a class="nav-link" href="contact.html">Contact</a>
-          <a class="nav-link active" href="login.php">Connexion</a>
-        </div>
-      </div>
-    </div>
-  </nav>
 
-  <!-- Login/Sign-Up Container -->
-  <div class="login-container card p-4">
+  <!-- Hamburger Button -->
+  <div class="hamburger">☰</div>
+
+  <!-- Barre latérale -->
+  <div class="sidebar text-white p-3">
+    <h4 class="mb-4">Messai Travel</h4>
+    <ul class="nav flex-column">
+      <li class="nav-item"><a class="nav-link text-white" href="index.php">Tableau de bord</a></li>
+      <li class="nav-item"><a class="nav-link text-white" href="offres.php">Offres touristiques</a></li>
+      <li class="nav-item"><a class="nav-link text-white active" href="destinations.php">Destinations</a></li>
+      <li class="nav-item"><a class="nav-link text-white" href="reservations.php">Réservations</a></li>
+      <li class="nav-item"><a class="nav-link text-white" href="clients.php">Clients</a></li>
+      <li class="nav-item"><a class="nav-link text-white" href="#">Rapports</a></li>
+      <li class="nav-item"><a class="nav-link text-white" href="#">Paramètres</a></li>
+      <li class="nav-item"><a class="nav-link text-white" href="?logout=1">Déconnexion</a></li>
+    </ul>
+  </div>
+
+  <!-- Contenu principal -->
+  <div class="content">
+    <h2 class="mb-4">Gestion des destinations</h2>
+
+    <!-- Message de confirmation -->
     <?php if ($message): ?>
-      <div class="alert alert-<?php echo htmlspecialchars($message_type); ?> alert-dismissible fade show" role="alert">
+      <div class="alert alert-success alert-dismissible fade show" role="alert">
         <?php echo htmlspecialchars($message); ?>
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
       </div>
     <?php endif; ?>
 
-    <h2 class="section-title" id="login-title">Connexion</h2>
-    <div class="tab-links">
-      <a href="#" class="tab-link active" onclick="toggleForm('login')">Connexion</a>
-      <a href="#" class="tab-link" onclick="toggleForm('signup')">S'inscription</a>
+    <!-- Formulaire d'ajout -->
+    <div class="card p-3 mb-4">
+      <h5>Ajouter une destination</h5>
+      <form action="ajouter_destination.php" method="POST">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <input type="text" name="nom" class="form-control" placeholder="Nom de la destination" required>
+          </div>
+          <div class="col-md-4">
+            <input type="text" name="pays" class="form-control" placeholder="Pays" required>
+          </div>
+          <div class="col-md-2">
+            <input type="number" name="offres" class="form-control" placeholder="Offres" value="0">
+          </div>
+          <div class="col-md-2">
+            <button type="submit" class="btn btn-primary w-100">Ajouter</button>
+          </div>
+        </div>
+      </form>
     </div>
-    <form id="login-form" action="login.php" method="POST" style="display: block;">
-      <input type="hidden" name="action" value="login">
-      <div class="form-group">
-        <label for="login-email" class="form-label">Email</label>
-        <input type="email" class="form-control" id="login-email" name="email" placeholder="Email" required>
-      </div>
-      <div class="form-group">
-        <label for="login-password" class="form-label">Mot de passe</label>
-        <input type="password" class="form-control" id="login-password" name="password" placeholder="Mot de passe" required>
-      </div>
-      <button type="submit" class="btn btn-yellow">Se connecter</button>
-    </form>
-    <form id="signup-form" action="login.php" method="POST" style="display: none;">
-      <input type="hidden" name="action" value="signup">
-      <div class="form-group">
-        <label for="signup-name" class="form-label">Nom complet</label>
-        <input type="text" class="form-control" id="signup-name" name="name" placeholder="Nom complet" required>
-      </div>
-      <div class="form-group">
-        <label for="signup-email" class="form-label">Email</label>
-        <input type="email" class="form-control" id="signup-email" name="email" placeholder="Email" required>
-      </div>
-      <div class="form-group">
-        <label for="signup-telephone" class="form-label">Téléphone</label>
-        <input type="tel" class="form-control" id="signup-telephone" name="telephone" placeholder="Téléphone" required>
-      </div>
-      <div class="form-group">
-        <label for="signup-adresse" class="form-label">Adresse</label>
-        <input type="text" class="form-control" id="signup-adresse" name="adresse" placeholder="Adresse" required>
-      </div>
-      <div class="form-group">
-        <label for="signup-password" class="form-label">Mot de passe</label>
-        <input type="password" class="form-control" id="signup-password" name="password" placeholder="Mot de passe" required>
-      </div>
-      <button type="submit" class="btn btn-yellow">S'inscrire</button>
-    </form>
+
+    <!-- Barre de recherche -->
+    <div class="search-container mb-4">
+      <form action="destinations.php" method="GET">
+        <input type="text" name="search" class="form-control" placeholder="Rechercher par nom ou pays..." value="<?php echo htmlspecialchars($search_query); ?>">
+      </form>
+    </div>
+
+    <!-- Liste des destinations -->
+    <div class="card p-3">
+      <h5>Liste des destinations</h5>
+      <table class="table mt-3">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Destination</th>
+            <th>Pays</th>
+            <th>Offres</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php if (empty($destinations)): ?>
+            <tr>
+              <td colspan="5" class="text-center">Aucune destination trouvée.</td>
+            </tr>
+          <?php else: ?>
+            <?php foreach ($destinations as $index => $destination): ?>
+              <tr>
+                <td><?php echo $offset + $index + 1; ?></td>
+                <td><?php echo htmlspecialchars($destination['nom']); ?></td>
+                <td><?php echo htmlspecialchars($destination['pays']); ?></td>
+                <td><?php echo $destination['offres']; ?></td>
+                <td>
+                  <a href="modifier_destination.php?id=<?php echo $destination['id']; ?>" class="btn btn-sm btn-warning">✏️</a>
+                  <a href="supprimer_destination.php?id=<?php echo $destination['id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Voulez-vous vraiment supprimer cette destination ?');">🗑️</a>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </tbody>
+      </table>
+
+      <!-- Pagination -->
+      <?php if ($total_pages > 1): ?>
+        <nav aria-label="Pagination">
+          <ul class="pagination justify-content-center">
+            <?php if ($page > 1): ?>
+              <li class="page-item">
+                <a class="page-link" href="destinations.php?page=<?php echo $page - 1; ?>&search=<?php echo urlencode($search_query); ?>">Précédent</a>
+              </li>
+            <?php endif; ?>
+            <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+              <li class="page-item <?php echo $i === $page ? 'active' : ''; ?>">
+                <a class="page-link" href="destinations.php?page=<?php echo $i; ?>&search=<?php echo urlencode($search_query); ?>"><?php echo $i; ?></a>
+              </li>
+            <?php endfor; ?>
+            <?php if ($page < $total_pages): ?>
+              <li class="page-item">
+                <a class="page-link" href="destinations.php?page=<?php echo $page + 1; ?>&search=<?php echo urlencode($search_query); ?>">Suivant</a>
+              </li>
+            <?php endif; ?>
+          </ul>
+        </nav>
+      <?php endif; ?>
+    </div>
   </div>
 
+  <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    function toggleForm(formType) {
-      const loginForm = document.getElementById('login-form');
-      const signupForm = document.getElementById('signup-form');
-      const loginTitle = document.getElementById('login-title');
-      const tabLinks = document.querySelectorAll('.tab-link');
-      
-      if (formType === 'login') {
-        loginForm.style.display = 'block';
-        signupForm.style.display = 'none';
-        loginTitle.textContent = 'Connexion';
-        tabLinks[0].classList.add('active');
-        tabLinks[1].classList.remove('active');
-      } else {
-        loginForm.style.display = 'none';
-        signupForm.style.display = 'block';
-        loginTitle.textContent = "S'inscription";
-        tabLinks[0].classList.remove('active');
-        tabLinks[1].classList.add('active');
-      }
-    }
+    const hamburger = document.querySelector('.hamburger');
+    const sidebar = document.querySelector('.sidebar');
+    const content = document.querySelector('.content');
 
-    // Validation côté client
-    document.querySelectorAll('form').forEach(form => {
-      form.addEventListener('submit', function(e) {
-        const email = this.querySelector('input[type="email"]')?.value;
-        const password = this.querySelector('input[type="password"]').value;
-        const telephone = this.querySelector('input[type="tel"]')?.value;
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        const telephoneRegex = /^\+?[0-9]{8,15}$/;
-        
-        if (email && !emailRegex.test(email)) {
-          e.preventDefault();
-          alert('Veuillez entrer un email valide.');
-          return;
-        }
-        if (telephone && !telephoneRegex.test(telephone)) {
-          e.preventDefault();
-          alert('Veuillez entrer un numéro de téléphone valide (8 à 15 chiffres).');
-          return;
-        }
-        if (password.length < 6) {
-          e.preventDefault();
-          alert('Le mot de passe doit contenir au moins 6 caractères.');
+    hamburger.addEventListener('click', () => {
+      sidebar.classList.toggle('sidebar-active');
+      sidebar.classList.toggle('sidebar-hidden');
+      content.classList.toggle('content-full');
+    });
+
+    // Fermer le menu sur mobile quand on clique sur un lien
+    document.querySelectorAll('.sidebar a').forEach(link => {
+      link.addEventListener('click', () => {
+        if (window.innerWidth <= 768) {
+          sidebar.classList.remove('sidebar-active');
+          sidebar.classList.add('sidebar-hidden');
+          content.classList.add('content-full');
         }
       });
     });

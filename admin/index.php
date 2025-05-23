@@ -114,13 +114,7 @@ unset($_SESSION['message']);
       object-fit: contain;
       margin-right: 20px;
     }
-    .search-container {
-      display: flex;
-      justify-content: center;
-      width: 100%;
-      max-width: 500px;
-      margin: 0 auto;
-    }
+
     .top-bar {
       display: flex;
       justify-content: space-between;
@@ -167,8 +161,8 @@ unset($_SESSION['message']);
       <li class="nav-item"><a class="nav-link text-white" href="destinations.php">Destinations</a></li>
       <li class="nav-item"><a class="nav-link text-white" href="reservations.php">Réservations</a></li>
       <li class="nav-item"><a class="nav-link text-white" href="clients.php">Clients</a></li>
-      <li class="nav-item"><a class="nav-link text-white" href="#">Rapports</a></li>
-      <li class="nav-item"><a class="nav-link text-white" href="#">Paramètres</a></li>
+      <li class="nav-item"><a class="nav-link text-white" href="rapports.php">Rapports</a></li>
+      <li class="nav-item"><a class="nav-link text-white" href="paramaitre.php">Paramètres</a></li>
       <li class="nav-item"><a class="nav-link text-white" href="?logout=1">Déconnexion</a></li>
     </ul>
   </div>
@@ -177,16 +171,17 @@ unset($_SESSION['message']);
   <div class="content">
     <!-- Barre supérieure -->
     <div class="top-bar">
-      <img src="assets/logo.png" alt="Logo Messai Travel" class="logo" />
-      <div class="search-container">
-        <form action="index.php" method="GET">
-          <input type="text" name="search" class="form-control" placeholder="Rechercher une destination..." value="<?php echo htmlspecialchars($search_query); ?>" />
-        </form>
-      </div>
+      <img src="assets/logo.jpg" alt="Logo Messai Travel" class="logo" />
+    
       <div>
-        <span class="me-3">🔔</span>
-        <span class="me-3">⚙️</span>
-        <span>👤</span>
+       
+          <a href="paramaitre.php" style="text-decoration: none; color: #243e93;">
+    <span class="me-3">⚙️</span> 
+  </a>
+  
+  <a href="rapports.php" style="text-decoration: none; color: #243e93;">
+    <span>📊</span> 
+  </a>
       </div>
     </div>
 

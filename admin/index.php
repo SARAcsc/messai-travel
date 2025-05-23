@@ -163,8 +163,7 @@ unset($_SESSION['message']);
       <li class="nav-item"><a class="nav-link text-white" href="clients.php">Clients</a></li>
       <li class="nav-item"><a class="nav-link text-white" href="rapports.php">Rapports</a></li>
       <li class="nav-item"><a class="nav-link text-white" href="paramaitre.php">Paramètres</a></li>
-      <li class="nav-item"><a class="nav-link text-white" href="?logout=1">Déconnexion</a></li>
-    </ul>
+      <li class="nav-item"><a class="nav-link text-white" href="../homepage/index.php">Déconnexion</a></li>
   </div>
 
   <!-- Contenu principal -->

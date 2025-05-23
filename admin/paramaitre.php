@@ -150,7 +150,7 @@ $motDePasse = "motdepasse123"; // À NE PAS afficher en production
       <li class="nav-item"><a class="nav-link text-white" href="clients.php">Clients</a></li>
       <li class="nav-item"><a class="nav-link text-white" href="rapports.php">Rapports</a></li>
       <li class="nav-item"><a class="nav-link text-white active" href="paramaitre.php">Paramètres</a></li>
-      <li class="nav-item"><a class="nav-link text-white" href="?logout=1">Déconnexion</a></li>
+    <li class="nav-item"><a class="nav-link text-white" href="../homepage/index.php">Déconnexion</a></li>
     </ul>
   </div>
 
